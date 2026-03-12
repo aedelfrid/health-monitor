@@ -1,0 +1,9 @@
+# Go binaries
+main
+monitor-api
+*.exe
+
+# JS dependencies
+node_modules/
+.next/
+dist/

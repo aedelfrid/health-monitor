@@ -12,4 +12,11 @@ This shows you understand Go’s concurrency and JS’s real-time capabilities.
 
 ## Backend
 
+get system stats
+ping URLs
+broadcast via WebSockets
+
 ## Frontend
+
+dashboard with status lights
+live-updating line chart
