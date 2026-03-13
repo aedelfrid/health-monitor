@@ -1,15 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
-	"fmt"
 
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 )
 
@@ -22,31 +22,42 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-
 func reader(conn *websocket.Conn) {
 	for {
-
 		// Get CPU usage percentage
 		cpuPercent, _ := cpu.Percent(time.Second, false)
-		cpuFormatted := fmt.Sprintf("%.2f", cpuPercent[0])
-		msg := fmt.Sprintf("CPU Usage: %s%%", cpuFormatted)
+		cpuUsage := 0.0
+		if len(cpuPercent) > 0 {
+			cpuUsage = cpuPercent[0]
+		}
 
 		// Get memory usage
 		vmStat, _ := mem.VirtualMemory()
-		memFormatted := fmt.Sprintf("%.2f", vmStat.UsedPercent)
-		msg += fmt.Sprintf(", Memory Usage: %s%%", memFormatted)
+		memUsage := vmStat.UsedPercent
 
 		// Get disk usage
 		diskStats, _ := disk.Usage("/")
-		diskFormatted := fmt.Sprintf("%.2f", diskStats.UsedPercent)
-		msg += fmt.Sprintf(", Disk Usage: %s%%", diskFormatted)
+		diskUsage := diskStats.UsedPercent
 
 		// Get network statistics
 		netStats, _ := net.IOCounters(true)
+		netSent := uint64(0)
+		netRecv := uint64(0)
 		if len(netStats) > 0 {
-			netFormatted := fmt.Sprintf("%.2f", float64(netStats[0].BytesSent))
-			msg += fmt.Sprintf(", Network Sent: %s B", netFormatted)
+			for _, iface := range netStats {
+				netSent += iface.BytesSent
+				netRecv += iface.BytesRecv
+			}
 		}
+
+		// Prepare JSON output to match frontend expectations
+		msg := fmt.Sprintf(`{
+			"cpu": %.2f,
+			"memory": %.2f,
+			"disk": %.2f,
+			"networkSent": %d,
+			"networkRecv": %d
+		}`, cpuUsage, memUsage, diskUsage, netSent, netRecv)
 
 		if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 			log.Println("Disconnected", err)
@@ -56,7 +67,7 @@ func reader(conn *websocket.Conn) {
 }
 
 func wsEndpoint(w http.ResponseWriter, r *http.Request) {
-	
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
