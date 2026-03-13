@@ -8,6 +8,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/net"
 )
 
 // WebSocket upgrader - allows us to upgrade HTTP connections to WebSocket connections
@@ -24,11 +27,26 @@ func reader(conn *websocket.Conn) {
 	for {
 
 		// Get CPU usage percentage
-		percent, _ := cpu.Percent(time.Second, false)
+		cpuPercent, _ := cpu.Percent(time.Second, false)
+		cpuFormatted := fmt.Sprintf("%.2f", cpuPercent[0])
+		msg := fmt.Sprintf("CPU Usage: %s%%", cpuFormatted)
 
-		// Send the CPU usage percentage to the client
-		//
-		msg := fmt.Sprintf("%.2f", percent[0])
+		// Get memory usage
+		vmStat, _ := mem.VirtualMemory()
+		memFormatted := fmt.Sprintf("%.2f", vmStat.UsedPercent)
+		msg += fmt.Sprintf(", Memory Usage: %s%%", memFormatted)
+
+		// Get disk usage
+		diskStats, _ := disk.Usage("/")
+		diskFormatted := fmt.Sprintf("%.2f", diskStats.UsedPercent)
+		msg += fmt.Sprintf(", Disk Usage: %s%%", diskFormatted)
+
+		// Get network statistics
+		netStats, _ := net.IOCounters(true)
+		if len(netStats) > 0 {
+			netFormatted := fmt.Sprintf("%.2f", float64(netStats[0].BytesSent))
+			msg += fmt.Sprintf(", Network Sent: %s B", netFormatted)
+		}
 
 		if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 			log.Println("Disconnected", err)
